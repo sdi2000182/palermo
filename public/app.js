@@ -163,7 +163,7 @@
     const r = S.roles[role]; if (!r) return '';
     const team = role === 'butcher' ? S.pub.settings.butcherTeam : r.team;
     // Rider–Waite–Smith painting, with the role's Greek name underneath; the blurb shows on your own big card
-    return `<div class="card rws tilt ${team} ${size || ''} ${extra || ''}"><img src="/tarot/${role}.jpg" alt="" loading="lazy" draggable="false">
+    return `<div class="card rws tilt ${team} ${size || ''} ${extra || ''}"><img src="/tarot/${role}.jpg" alt="" loading="lazy" draggable="false" width="420" height="720" style="width:100%;height:auto;display:block">
       <div class="cap"><b>${esc(r.gr)}</b><span>${esc(r.name)}</span></div>${size === 'big' ? `<div class="blurb">${esc(r.blurb)}</div>` : ''}</div>`;
   }
   function knowsHTML() {
@@ -309,7 +309,7 @@
         <div class="cards" style="margin:14px 0">${specials.map(k => `<div data-role="${k}" class="toggle">${roleCard(k, '', deck[k] ? 'toggle' : 'off toggle')}</div>`).join('')}
           <div>${roleCard('citizen', '', cit > 0 ? '' : 'off')}<div style="text-align:center;margin-top:8px" class="muted">× ${Math.max(0, cit)} citizens</div></div></div>
         <div class="label">Jokers · house rules</div>
-        <div class="cards" style="margin:14px 0">${Object.entries(S.jokers).map(([k, j]) => `<div class="jk"><div class="card rws joker tilt toggle ${st.jokers[k] ? '' : 'off'}" data-joker="${k}"><img src="/tarot/${k}.jpg" alt="" loading="lazy" draggable="false"><div class="cap"><b>${esc(j.name)}</b></div></div><div class="jt">${esc(j.text)}</div></div>`).join('')}</div>
+        <div class="cards" style="margin:14px 0">${Object.entries(S.jokers).map(([k, j]) => `<div class="jk"><div class="card rws joker tilt toggle ${st.jokers[k] ? '' : 'off'}" data-joker="${k}"><img src="/tarot/${k}.jpg" alt="" loading="lazy" draggable="false" width="420" height="720" style="width:100%;height:auto;display:block"><div class="cap"><b>${esc(j.name)}</b></div></div><div class="jt">${esc(j.text)}</div></div>`).join('')}</div>
         <div class="toggle-row" style="margin-bottom:12px"><span class="label">Talk time</span>
           <div class="seg">${[60, 120, 180, 300, 480].map(s => `<button data-talk="${s}" class="${st.discussSec === s ? 'on' : ''}">${s / 60}m</button>`).join('')}</div>
           <span class="label" style="margin-left:8px">Butcher plays for</span>
