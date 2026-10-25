@@ -27,6 +27,7 @@ a{color:var(--gold)}
 .btn.gold{background:var(--gold);box-shadow:0 5px 0 var(--gold-d);color:#3b2600;text-shadow:none}
 .btn.green{background:var(--green);box-shadow:0 5px 0 var(--green-d)}
 .btn.grey{background:#59686c;box-shadow:0 5px 0 #384447}
+.btn.purple{background:var(--purple);box-shadow:0 5px 0 var(--purple-d)}
 .btn.small{font-size:15px;padding:7px 12px;box-shadow-width:3px}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn.wide{width:100%}
@@ -142,7 +143,8 @@ h1,h2,h3{margin:0;font-weight:900;letter-spacing:.5px}
 .qr img,.qr canvas{display:block}
 .names{display:flex;flex-wrap:wrap;gap:8px}
 .names .btn{font-size:16px}
-.toggle-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.toggle-row{display:flex;gap:10px 12px;flex-wrap:wrap;align-items:center;margin:18px 0}
+.host .cards{margin:16px 0 26px!important}
 .seg{display:inline-flex;border-radius:9px;overflow:hidden;box-shadow:0 4px 0 var(--panel-d)}
 .seg button{border:0;padding:7px 12px;background:var(--panel-in);cursor:pointer;font-weight:600}
 .seg button.on{background:var(--blue)}
@@ -154,3 +156,35 @@ h1,h2,h3{margin:0;font-weight:900;letter-spacing:.5px}
   .btn{font-size:16px;padding:10px 14px}
 }
 .card:not(.big) .tx{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+
+/* tarot cards: team-coloured edge, dark face, gold symbol, ornate double frame */
+:root{--tarot-bg:#15151f}
+.card.tarot{padding:6px}
+.card.tarot .face{background:radial-gradient(circle at 50% 36%,#2b2442 0,var(--tarot-bg) 68%);color:var(--gold);
+  box-shadow:inset 0 0 0 2px #e2b55a,inset 0 0 0 5px var(--tarot-bg),inset 0 0 0 6px rgba(226,181,90,.55);padding:10px 9px 12px;text-shadow:none}
+.card.tarot .face::before,.card.tarot .face::after{content:"✦";position:absolute;font-size:11px;color:#e2b55a;line-height:1}
+.card.tarot .face::before{top:9px;left:10px}.card.tarot .face::after{bottom:9px;right:10px}
+.card.tarot .num{font-family:"EB Garamond",Georgia,serif;font-weight:700;letter-spacing:3px;font-size:14px;color:#e2b55a;min-height:16px}
+.card.tarot .art{margin:4px 0 2px;filter:drop-shadow(0 0 10px rgba(245,178,68,.35))}
+.card.tarot .art .sym{width:72px;height:72px;color:#f0c46a}
+.card.tarot.killers .art .sym{color:#ff8a7a}
+.card.tarot.trela .art .sym{color:#c9a7ff}
+.card.tarot .nm{font-family:"EB Garamond",Georgia,serif;font-weight:800;font-size:19px;color:#f6e7c1;text-transform:uppercase;letter-spacing:1px;line-height:1.05}
+.card.tarot .gr{font-size:11px;color:#a89a78;letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+.card.tarot .tx{color:#d9cfb8;font-size:12px}
+.card.tarot.big .art .sym{width:128px;height:128px}
+.card.tarot.big .nm{font-size:30px}.card.tarot.big .num{font-size:18px}.card.tarot.big .gr{font-size:14px}
+.card.tarot.joker .art .sym{width:60px;height:60px}
+.card.back .face{background:radial-gradient(circle,#2b2442 0,#15151f 70%),#15151f;box-shadow:inset 0 0 0 2px #e2b55a,inset 0 0 0 5px #15151f,inset 0 0 0 6px rgba(226,181,90,.55);color:#e2b55a}
+.card.back .face b{font-family:"EB Garamond",Georgia,serif;font-size:64px}
+.sym{display:inline-block;vertical-align:middle;flex:none}
+.story .ln .ic{color:var(--gold)}
+.seat .st .sym{color:var(--gold)}
+.seat .skull{color:#fff;opacity:.85}
+.card.tarot:not(.big) .nm{font-size:14px;letter-spacing:.3px;overflow-wrap:anywhere;hyphens:auto}
+.card.tarot:not(.big) .art .sym{width:58px;height:58px}
+.card.tarot:not(.big) .tx{display:none}
+.card.tarot:not(.big) .face{justify-content:center}
+.jk{width:132px;text-align:center}
+.jk .jt{font-size:12px;color:var(--ink2);margin-top:12px;line-height:1.3}
+@media (max-width:560px){.jk{width:116px}}

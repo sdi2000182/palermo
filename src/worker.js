@@ -90,20 +90,36 @@ export class Room extends DurableObject {
         if (d.butcherTeam) g.settings.butcherTeam = d.butcherTeam === 'town' ? 'town' : 'killers';
         break;
       case 'kick': if (host && g.phase === 'lobby') g.players = g.players.filter(x => x.id !== d.pid); break;
+      case 'addBot': if (host && g.phase === 'lobby') r = G.addBot(g); break;
+      case 'removeBots': if (host && g.phase === 'lobby') g.players = g.players.filter(x => !x.bot); break;
       case 'start': if (host && g.phase === 'lobby') r = G.start(g); break;
       case 'advance': if (host) r = G.advance(g) || {}; break;
       case 'lobby': if (host) G.backToLobby(g); break;
       default: return;
     }
     if (r && r.error && d.t !== 'hello') err(r.error);
-    // a full vote closes itself after a few seconds, so people can still change their minds
-    if (g.phase === 'vote' && G.allVoted(g)) await this.ctx.storage.setAlarm(Date.now() + 4000);
-    await this.save();
     this.broadcast();
+    await this.schedule();
+    await this.save();
+  }
+
+  // one alarm drives both bots (test mode) and closing a full vote after a short grace period
+  async schedule() {
+    const g = this.g, now = Date.now();
+    if (g.phase === 'vote' && G.allVoted(g)) g.allVotedAt = g.allVotedAt || now; else g.allVotedAt = 0;
+    const times = [];
+    if (G.botsPending(g)) times.push(now + 1200 + Math.random() * 1500);
+    if (g.allVotedAt) times.push(g.allVotedAt + 4000);
+    if (times.length) await this.ctx.storage.setAlarm(Math.min(...times));
   }
 
   async alarm() {
-    if (this.g && this.g.phase === 'vote' && G.allVoted(this.g)) { G.closeVote(this.g); await this.save(); this.broadcast(); }
+    const g = this.g; if (!g) return;
+    if (G.botsPending(g)) G.botStep(g);
+    if (g.phase === 'vote' && G.allVoted(g) && g.allVotedAt && Date.now() - g.allVotedAt >= 3500) { G.closeVote(g); g.allVotedAt = 0; }
+    this.broadcast();
+    await this.schedule();
+    await this.save();
   }
 
   async webSocketClose(ws) { this.broadcast(); }
@@ -117,7 +133,8 @@ export class Room extends DurableObject {
     for (const ws of sockets) {
       const a = ws.deserializeAttachment() || {};
       const p = a.pid ? g.players.find(x => x.id === a.pid) : null;
-      try { ws.send(JSON.stringify({ t: 'state', pub, me: p ? G.privateView(g, p) : null, host: !!a.host, roles: G.ROLES, jokers: G.JOKERS })); } catch {}
+      const bots = a.host ? g.players.filter(x => x.bot).map(x => ({ name: x.name, token: x.token })) : undefined;
+      try { ws.send(JSON.stringify({ t: 'state', pub, me: p ? G.privateView(g, p) : null, host: !!a.host, bots, roles: G.ROLES, jokers: G.JOKERS })); } catch {}
     }
   }
 }

@@ -11,8 +11,8 @@ export const ROLES = {
                blurb: 'Each night pick someone to silence: tomorrow they can\'t speak or vote.' },
   detective: { name: 'Detective', gr: 'Αστυνόμος', art: 'ο Αστυνόμος', team: 'town',
                blurb: 'You know who the Shown Killer is. Steer the town without getting killed.' },
-  snitch:    { name: 'Snitch', gr: 'Ρουφιάνος', art: 'ο Ρουφιάνος', team: 'town',
-               blurb: 'You know who the Hidden Killer is. Rat them out, carefully.' },
+  snitch:    { name: 'Snitch', gr: 'Ρουφιάνος', art: 'ο Ρουφιάνος', team: 'killers',
+               blurb: 'You secretly work for the killers. You know the Hidden Killer; they don\'t know you.' },
   doctor:    { name: 'Doctor', gr: 'Γιατρός', art: 'ο Γιατρός', team: 'town', night: 'save',
                blurb: 'Each night protect one person. Never the same person two nights running.' },
   mayor:     { name: 'Mayor', gr: 'Δήμαρχος', art: 'ο Δήμαρχος', team: 'town',
@@ -47,7 +47,8 @@ export function defaultDeck(n) {
   if (n >= 5) d.doctor = 1;
   if (n >= 7) d.mayor = 1;
   if (n >= 8) d.trela = 1;
-  if (n >= 9) d.butcher = 1;
+  // the Snitch already joins the killers, so the Butcher only comes in for big tables
+  if (n >= 11) d.butcher = 1;
   return d;
 }
 
@@ -60,6 +61,8 @@ export function newGame(code, hostKey) {
 }
 
 export const teamOf = (g, p) => p.role === 'butcher' ? g.settings.butcherTeam : (ROLES[p.role] || {}).team;
+// the killers who know each other (the Snitch is on their side but works in secret)
+export const isCore = (g, p) => p.role === 'hidden' || p.role === 'shown' || (p.role === 'butcher' && g.settings.butcherTeam === 'killers');
 const alive = g => g.players.filter(p => p.alive);
 const byId = (g, id) => g.players.find(p => p.id === id);
 const say = (g, kind, key, vars) => {
@@ -68,14 +71,14 @@ const say = (g, kind, key, vars) => {
 };
 
 /* ---------- lobby ---------- */
-export function join(g, name) {
+export function join(g, name, bot) {
   name = String(name || '').trim().slice(0, 24);
   if (!name) return { error: 'Pick a name.' };
   const ex = g.players.find(p => p.name.toLowerCase() === name.toLowerCase());
   if (ex) return { error: `${ex.name} is already in. If that's you, rejoin from the same phone.` };
   if (g.phase !== 'lobby') return { error: 'The game already started. Wait for the next round.' };
   if (g.players.length >= MAX_PLAYERS) return { error: 'The table is full.' };
-  const p = { id: token(4), token: token(), name, alive: true, role: null, ready: false, silenced: false, mayorRevealed: false, lover: null };
+  const p = { id: token(4), token: token(), name, alive: true, role: null, ready: false, silenced: false, mayorRevealed: false, lover: null, bot: !!bot };
   g.players.push(p);
   return { player: p };
 }
@@ -133,7 +136,7 @@ export function act(g, p, target) {
   if (g.phase !== 'night' || !p.alive) return { error: 'Not now.' };
   const kind = nightAction(g, p), t = byId(g, target);
   if (!t || !t.alive) return { error: 'Pick someone alive.' };
-  if (kind === 'kill' && teamOf(g, t) === 'killers') return { error: 'That\'s one of you.' };
+  if (kind === 'kill' && isCore(g, t)) return { error: 'That\'s one of you.' };
   if (kind === 'save' && g.lastSave === t.id) return { error: 'You saved them last night. Pick someone else.' };
   if (kind === 'silence' && (t.id === p.id || g.lastSilence === t.id)) return { error: t.id === p.id ? 'You can\'t silence yourself.' : 'They were silenced last night. Pick someone else.' };
   g.night.acts[p.id] = { target: t.id };
@@ -250,9 +253,10 @@ function toDusk(g, executed) {
 
 /* ---------- winning ---------- */
 export function checkWin(g) {
+  // the town wins once both murderers are gone; the killers' side (Snitch included) wins on numbers
   const live = alive(g), k = live.filter(p => teamOf(g, p) === 'killers').length, o = live.length - k;
   let w = null;
-  if (k === 0) w = 'town';
+  if (!live.some(p => p.role === 'hidden' || p.role === 'shown')) w = 'town';
   else if (k >= o) w = 'killers';
   if (!w) return false;
   g.phase = 'over'; g.winner = w; g.endsAt = 0; g.night = null;
@@ -284,7 +288,7 @@ export function publicView(g) {
     code: g.code, phase: g.phase, round: g.round, endsAt: g.endsAt, winner: g.winner,
     settings: Object.assign({}, g.settings, { deck: deckFor(g).deck }), citizens: deckFor(g).citizens,
     players: g.players.map(p => ({
-      id: p.id, name: p.name, alive: p.alive, connected: !!p.connected, silenced: p.silenced, ready: p.ready,
+      id: p.id, name: p.name, alive: p.alive, connected: !!p.connected, bot: !!p.bot, silenced: p.silenced, ready: p.ready,
       mayor: p.mayorRevealed, role: (over || p.revealed) ? p.role : null, lover: over ? p.lover : null,
     })),
     votes: fogged ? null : g.votes, voted: Object.keys(g.votes), tally: fogged ? null : tally(g), voteRestrict: g.voteRestrict,
@@ -298,10 +302,10 @@ export function privateView(g, p) {
   const myTeam = teamOf(g, p);
   for (const o of g.players) {
     if (o.id === p.id) continue;
-    if (myTeam === 'killers' && teamOf(g, o) === 'killers') knows.push({ id: o.id, name: o.name, as: ROLES[o.role].name });
+    if (isCore(g, p) && isCore(g, o)) knows.push({ id: o.id, name: o.name, as: ROLES[o.role].name });
     else if (p.role === 'detective' && o.role === 'shown') knows.push({ id: o.id, name: o.name, as: 'Shown Killer' });
     else if (p.role === 'snitch' && o.role === 'hidden') knows.push({ id: o.id, name: o.name, as: 'Hidden Killer' });
-    if (p.lover === o.id) knows.push({ id: o.id, name: o.name, as: 'your Lover 💘' });
+    if (p.lover === o.id) knows.push({ id: o.id, name: o.name, as: 'your Lover' });
   }
   const me = { id: p.id, name: p.name, role: p.role, team: myTeam, alive: p.alive, silenced: p.silenced, mayorRevealed: p.mayorRevealed, knows, ready: p.ready };
   if (g.phase === 'night' && g.night && p.alive) {
@@ -309,11 +313,53 @@ export function privateView(g, p) {
     me.night = { kind, target: mine ? mine.target : null, blocked: [] };
     if (kind === 'kill') {
       me.night.partners = killers(g).filter(k => k.id !== p.id).map(k => ({ name: k.name, target: (g.night.acts[k.id] || {}).target || null }));
-      me.night.blocked = g.players.filter(o => teamOf(g, o) === 'killers').map(o => o.id);
+      me.night.blocked = g.players.filter(o => isCore(g, o)).map(o => o.id);
     }
     if (kind === 'save' && g.lastSave) me.night.blocked = [g.lastSave];
     if (kind === 'silence') me.night.blocked = [p.id, g.lastSilence].filter(Boolean);
   }
   if (g.phase === 'vote') { me.vote = g.votes[p.id] || null; me.canVote = canVote(g, p); }
   return me;
+}
+
+/* ---------- test mode: bots play themselves unless someone opens their phone ---------- */
+const BOT_NAMES = ['Γιώργος', 'Μαρία', 'Κώστας', 'Ελένη', 'Νίκος', 'Κατερίνα', 'Δημήτρης', 'Σοφία', 'Γιάννης', 'Άννα', 'Πέτρος', 'Δέσποινα', 'Στέλιος', 'Βάσω', 'Μανώλης'];
+export function addBot(g) {
+  const name = BOT_NAMES.map(n => 'Bot ' + n).find(n => !g.players.some(p => p.name === n));
+  return name ? join(g, name, true) : { error: 'No more bot names.' };
+}
+function needsBot(g, p) {
+  if (!p.bot || p.connected) return false;
+  if (g.phase === 'reveal') return !p.ready;
+  if (g.phase === 'night' && g.night && p.alive) {
+    const a = g.night.acts[p.id];
+    if (!a) return true;
+    // a bot killer follows a human partner's pick, so the night can end
+    return nightAction(g, p) === 'kill' && killers(g).some(k => k.id !== p.id && !k.bot && g.night.acts[k.id] && g.night.acts[k.id].target !== a.target);
+  }
+  if (g.phase === 'vote') return canVote(g, p) && !g.votes[p.id];
+  return false;
+}
+export const botsPending = g => g.players.some(p => needsBot(g, p));
+export function botStep(g) {
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  for (const p of g.players) {
+    if (!needsBot(g, p)) continue;
+    if (g.phase === 'reveal') { ready(g, p); continue; }
+    if (g.phase === 'night') {
+      const kind = nightAction(g, p), live = alive(g);
+      let t = null;
+      if (kind === 'kill') {
+        const partner = killers(g).filter(k => k.id !== p.id && g.night.acts[k.id]).sort((a, b) => a.bot - b.bot)[0];
+        t = partner ? g.night.acts[partner.id].target : (pick(live.filter(o => !isCore(g, o))) || {}).id;
+      } else if (kind === 'save') t = (pick(live.filter(o => o.id !== g.lastSave)) || {}).id;
+      else if (kind === 'silence') t = (pick(live.filter(o => o.id !== p.id && o.id !== g.lastSilence)) || {}).id;
+      else t = (pick(live.filter(o => o.id !== p.id)) || {}).id;
+      if (t) act(g, p, t);
+      if (g.phase !== 'night') return;
+    } else if (g.phase === 'vote') {
+      const opts = alive(g).filter(o => o.id !== p.id && (!g.voteRestrict || g.voteRestrict.includes(o.id)));
+      if (opts.length) vote(g, p, pick(opts).id);
+    }
+  }
 }

@@ -3,9 +3,13 @@
 The Greek party game, on your phones. Everyone's phone is their secret role card;
 a shared "table" screen (laptop, TV, or the host's phone) tells the story out loud.
 
-Roles: Hidden Killer, Shown Killer, Butcher (silences someone for a round), Detective (knows the Shown Killer),
-Snitch (knows the Hidden Killer), Doctor, Mayor, Trela, Citizens. House rules come
-as Joker cards: Open Graves, Lovers, Fog, Last Words, Second Chance, Iron Mayor.
+Roles: Hidden Killer, Shown Killer, Butcher (silences someone for a round), Detective
+(knows the Shown Killer), Snitch (secretly on the killers' side, knows the Hidden Killer),
+Doctor, Mayor, Trela, Citizens. House rules come as Joker cards: Open Graves, Lovers,
+Fog, Last Words, Second Chance, Iron Mayor. The narrator speaks Greek.
+
+Test mode: in the lobby the host can add bots that play by themselves, and open any
+bot's phone in another tab to play as them.
 
 Runs on Cloudflare Workers (free plan): the game runs on the server in a Durable
 Object, so roles never reach anyone else's phone.

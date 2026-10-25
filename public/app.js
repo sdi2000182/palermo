@@ -5,7 +5,7 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const CREW = ['Theodora', 'Giannis', 'Nick', 'Irene', 'Evelynn', 'Eva', 'Sotiria', 'Athanasia', 'oddfishgirl'];
   const COLORS = ['#fe5f55', '#009dff', '#f5b244', '#35bd86', '#8a6ac9', '#ff8fb1', '#00b8bd', '#ff9a3c', '#6cc24a', '#c96ad6', '#5a8dff', '#d9c23d', '#ff6f91', '#49c6e5', '#b0884f', '#9ad1a6'];
-  const spr = (name, size, cls) => window.SPR.img(name, size || 20, cls);
+  const spr = (name, size, cls) => window.TAROT.svg(name, size || 20, cls);
   const PHASE = {
     lobby: ['Lobby', 'Waiting for everyone to join'], reveal: ['Your role', 'Look at your card. Don\'t let anyone see.'],
     night: ['Night', 'Eyes closed. Act in secret.'], day: ['Day', 'Talk. Accuse. Lie.'], vote: ['The Vote', 'Who goes to the fountain?'],
@@ -15,11 +15,12 @@
   const params = new URLSearchParams(location.search);
   const code = (params.get('r') || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
   const tableMode = params.get('table') === '1';
+  const asToken = params.get('as') || '';   // test mode: this tab plays as a bot
   const store = {
     get() { try { return JSON.parse(localStorage.getItem('palermo:' + code)) || {}; } catch (e) { return {}; } },
     set(o) { try { localStorage.setItem('palermo:' + code, JSON.stringify(Object.assign(store.get(), o))); } catch (e) { } },
   };
-  let S = { pub: null, me: null, host: false, roles: {}, jokers: {}, conn: 'idle' };
+  let S = { pub: null, me: null, host: false, bots: [], roles: {}, jokers: {}, conn: 'idle' };
   let ws = null, retry = 0, pendingName = null, layout = '';
   const ui = { flipped: false, peek: false, tts: false, lastStory: 0, nameErr: '', missing: false };
   try { ui.tts = localStorage.getItem('palermo:tts') === '1'; } catch (e) { }
@@ -43,14 +44,14 @@
     ws.onopen = () => {
       retry = 0; S.conn = 'open';
       const st = store.get();
-      send({ t: 'hello', token: st.token, hostKey: st.hostKey, name: pendingName || undefined });
+      send({ t: 'hello', token: asToken || st.token, hostKey: asToken ? undefined : st.hostKey, name: pendingName || undefined });
       pendingName = null; renderTop();
     };
     ws.onmessage = e => {
       const d = JSON.parse(e.data);
-      if (d.t === 'welcome') store.set({ token: d.token });
+      if (d.t === 'welcome') { if (!asToken) store.set({ token: d.token }); }
       else if (d.t === 'error') { toast(d.text); if (!S.me) { ui.nameErr = d.text; render(); } }
-      else if (d.t === 'state') { Object.assign(S, { pub: d.pub, me: d.me, host: d.host, roles: d.roles, jokers: d.jokers }); onState(); }
+      else if (d.t === 'state') { Object.assign(S, { pub: d.pub, me: d.me, host: d.host, bots: d.bots || [], roles: d.roles, jokers: d.jokers }); onState(); }
     };
     ws.onclose = () => { S.conn = 'closed'; renderTop(); setTimeout(connect, Math.min(8000, 400 * 2 ** retry++)); };
   }
@@ -92,6 +93,7 @@
     const el = $('#top'); if (!el || !S.pub) return;
     const p = S.pub, ph = PHASE[p.phase] || [p.phase];
     el.innerHTML = `<div class="top"><span class="brand">PALERMO</span><span class="chip code" title="Room code">${esc(p.code)}</span>
+      ${asToken && S.me ? `<span class="chip" style="background:var(--purple);box-shadow:0 4px 0 var(--purple-d)">Test: playing as ${esc(S.me.name)}</span>` : ''}
       <span class="chip">${ph[0]}${['night', 'day', 'vote'].includes(p.phase) ? ' ' + p.round : ''}</span>
       <span class="chip timer hidden" data-timer></span><span class="grow"></span>
       ${S.conn !== 'open' ? '<span class="chip" style="background:var(--red)">offline…</span>' : ''}
@@ -159,12 +161,13 @@
   function roleCard(role, size, extra) {
     const r = S.roles[role]; if (!r) return '';
     const team = role === 'butcher' ? S.pub.settings.butcherTeam : r.team;
-    return `<div class="card tilt ${team} ${size || ''} ${extra || ''}"><div class="face"><div class="art">${spr(role, 64)}</div>
-      <div class="nm">${esc(r.name)}</div><div class="gr">${esc(r.gr)}</div><div class="tx">${esc(r.blurb)}</div></div></div>`;
+    return `<div class="card tarot tilt ${team} ${size || ''} ${extra || ''}"><div class="face"><div class="num">${TAROT.NUM[role] || ''}</div>
+      <div class="art">${spr(role, 72)}</div><div class="nm">${esc(r.gr)}</div><div class="gr">${esc(r.name)}</div><div class="tx">${esc(r.blurb)}</div></div></div>`;
   }
   function knowsHTML() {
     const k = S.me.knows || [];
-    const team = S.me.team === 'killers' ? 'You play for the <b>killers</b>.' : S.me.team === 'trela' ? 'You play <b>alone</b>.' : 'You play for the <b>town</b>.';
+    const team = S.me.role === 'snitch' ? 'You secretly play for the <b>killers</b>. They don\'t know who you are.'
+      : S.me.team === 'killers' ? 'You play for the <b>killers</b>.' : S.me.team === 'trela' ? 'You play <b>alone</b>.' : 'You play for the <b>town</b>.';
     return `<div class="knows"><div class="k">${team}</div>${k.map(x => `<div class="k"><b>${esc(x.name)}</b> is ${esc(x.as)}</div>`).join('')}</div>`;
   }
   function seatsHTML(o) {
@@ -174,13 +177,13 @@
     return `<div class="seats">${p.players.map(pl => {
       const r = pl.role ? S.roles[pl.role] : null;
       const blocked = o.pick && (!pl.alive || (o.blocked || []).includes(pl.id) || (o.only && !o.only.includes(pl.id)));
-      const st = !pl.alive ? (r ? r.name : 'dead') : pl.silenced ? 'silenced' : pl.mayor ? 'Mayor' : p.phase === 'reveal' ? (pl.ready ? 'ready' : '…') : p.phase === 'vote' && p.voted.includes(pl.id) ? 'voted' : '';
+      const st = pl.bot && pl.alive && !pl.silenced && !pl.mayor && p.phase === 'lobby' ? 'bot' : !pl.alive ? (r ? r.name : 'dead') : pl.silenced ? 'silenced' : pl.mayor ? 'Mayor' : p.phase === 'reveal' ? (pl.ready ? 'ready' : '…') : p.phase === 'vote' && p.voted.includes(pl.id) ? 'voted' : '';
       const sti = !pl.alive ? (r ? spr(pl.role, 14) : '') : pl.silenced ? spr('butcher', 14) : pl.mayor ? spr('mayor', 14) : '';
       const vs = o.votes && voters[pl.id] ? voters[pl.id] : [];
-      return `<div class="seat ${pl.alive ? '' : 'dead'} ${pl.connected ? '' : 'off'} ${o.pick && !blocked ? 'pick' : ''} ${blocked ? 'blocked' : ''} ${o.sel === pl.id ? 'sel' : ''}" ${o.pick && !blocked ? `data-pick="${pl.id}"` : ''}>
+      return `<div class="seat ${pl.alive ? '' : 'dead'} ${pl.connected || pl.bot ? '' : 'off'} ${o.pick && !blocked ? 'pick' : ''} ${blocked ? 'blocked' : ''} ${o.sel === pl.id ? 'sel' : ''}" ${o.pick && !blocked ? `data-pick="${pl.id}"` : ''}>
         ${o.kick && S.me && pl.id !== S.me.id || o.kick && !S.me ? `<span class="badge" data-kick="${pl.id}" title="Remove" style="cursor:pointer">✕</span>` : ''}
         ${vs.length ? `<span class="badge blue">${vs.length}</span>` : ''}
-        ${pl.alive ? '' : spr('skull', 26, 'skull')}<div class="av" style="background:${color(pl.id)}">${esc(pl.name.slice(0, 1).toUpperCase())}</div>
+        ${pl.alive ? '' : spr('skull', 26, 'skull')}<div class="av" style="background:${color(pl.id)}">${esc(pl.name.replace(/^Bot /, '').slice(0, 1).toUpperCase())}</div>
         <div class="nm">${esc(pl.name)}${S.me && pl.id === S.me.id ? ' (you)' : ''}</div><div class="st">${sti} ${esc(st)}</div>
         ${vs.length ? `<div class="vstack">${vs.map(v => `<i style="background:${color(v)}" title="${esc(pname(v))}"></i>`).join('')}</div>` : ''}
       </div>`;
@@ -299,12 +302,18 @@
         <div class="cards" style="margin:14px 0">${specials.map(k => `<div data-role="${k}" class="toggle">${roleCard(k, '', deck[k] ? 'toggle' : 'off toggle')}</div>`).join('')}
           <div>${roleCard('citizen', '', cit > 0 ? '' : 'off')}<div style="text-align:center;margin-top:8px" class="muted">× ${Math.max(0, cit)} citizens</div></div></div>
         <div class="label">Jokers · house rules</div>
-        <div class="cards" style="margin:14px 0">${Object.entries(S.jokers).map(([k, j]) => `<div class="card joker tilt toggle ${st.jokers[k] ? '' : 'off'}" data-joker="${k}"><div class="face"><div class="art">${spr(k, 64)}</div><div class="nm">${esc(j.name)}</div><div class="tx">${esc(j.text)}</div></div></div>`).join('')}</div>
+        <div class="cards" style="margin:14px 0">${Object.entries(S.jokers).map(([k, j]) => `<div class="jk"><div class="card tarot joker tilt toggle ${st.jokers[k] ? '' : 'off'}" data-joker="${k}"><div class="face"><div class="num">${TAROT.NUM[k] || ''}</div><div class="art">${spr(k, 60)}</div><div class="nm">${esc(j.name)}</div></div></div><div class="jt">${esc(j.text)}</div></div>`).join('')}</div>
         <div class="toggle-row" style="margin-bottom:12px"><span class="label">Talk time</span>
           <div class="seg">${[60, 120, 180, 300, 480].map(s => `<button data-talk="${s}" class="${st.discussSec === s ? 'on' : ''}">${s / 60}m</button>`).join('')}</div>
           <span class="label" style="margin-left:8px">Butcher plays for</span>
           <div class="seg"><button data-bt="killers" class="${st.butcherTeam === 'killers' ? 'on' : ''}">killers</button><button data-bt="town" class="${st.butcherTeam === 'town' ? 'on' : ''}">town</button></div></div>
-        <div class="row"><button class="btn green" data-a="start" ${ok ? '' : 'disabled'}>Start with ${n}</button>
+        <div class="toggle-row"><span class="label">Test mode</span>
+          <button class="btn small purple" data-a="bot">+ Bot</button>
+          <button class="btn small purple" data-a="fill" ${n >= 10 ? 'disabled' : ''}>Fill to 10 with bots</button>
+          ${S.bots.length ? '<button class="btn small grey" data-a="nobots">Remove bots</button>' : ''}
+          <span class="faint" style="font-size:14px">Bots play by themselves. Open one's phone to play as them.</span></div>
+        ${botLinks()}
+        <div class="row" style="margin-top:22px"><button class="btn green" data-a="start" ${ok ? '' : 'disabled'}>Start with ${n}</button>
           <span class="faint">${n < 4 ? 'Need at least 4 players.' : cit < 0 ? `Too many roles: remove ${-cit}.` : !(deck.hidden || deck.shown) ? 'Add at least one killer.' : ''}</span>
           <span class="grow"></span>${tableMode ? '' : `<a class="btn small blue" href="/?r=${p.code}&table=1" target="_blank">Open table screen</a>`}</div>
         ${tableMode ? '' : `<div style="margin-top:14px" class="row"><div class="qr" id="qr"></div><div class="muted">Friends scan this or open<br><b>${esc(location.host)}</b> and type <b style="color:var(--gold)">${esc(p.code)}</b></div></div>`}</div>`;
@@ -314,7 +323,14 @@
     return `<div class="panel host"><div class="label" style="margin-bottom:10px">Host</div><div class="row">
       ${next ? `<button class="btn ${p.phase === 'day' ? 'gold' : 'blue'}" data-a="advance" ${nightLocked ? 'disabled' : ''}>${next}</button>` : ''}
       ${p.phase === 'over' ? '<button class="btn green" data-a="lobby">New round, same people</button>' : '<button class="btn small grey" data-a="lobby">End game</button>'}
+      ${botLinks()}
       ${p.phase === 'night' ? `<span class="faint">${p.acted}/${p.aliveCount} acted. ${p.killersChose ? 'The killers have chosen; you can end the night if someone is stuck.' : 'The night only ends once the killers agree on a victim.'}</span>` : ''}</div></div>`;
+  }
+
+  function botLinks() {
+    if (!S.bots.length) return '';
+    return `<div class="toggle-row" style="margin-top:4px"><span class="label">Open a bot's phone</span>${S.bots.map(b =>
+      `<a class="btn small grey" target="_blank" href="/?r=${esc(S.pub.code)}&as=${esc(b.token)}">${esc(b.name.replace(/^Bot /, ''))}</a>`).join('')}</div>`;
   }
 
   /* ---------------- home & name ---------------- */
@@ -374,6 +390,9 @@
       case 'unvote': send({ t: 'vote', target: null }); break;
       case 'leave': send({ t: 'leave' }); store.set({ token: null }); break;
       case 'start': send({ t: 'start' }); break;
+      case 'bot': send({ t: 'addBot' }); break;
+      case 'fill': for (let i = p.players.length; i < 10; i++) setTimeout(() => send({ t: 'addBot' }), (i - p.players.length) * 120); break;
+      case 'nobots': send({ t: 'removeBots' }); break;
       case 'advance': send({ t: 'advance' }); break;
       case 'lobby': if (p.phase === 'over' || confirm('End this game for everyone?')) send({ t: 'lobby' }); break;
       case 'tts':
