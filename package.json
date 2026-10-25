@@ -1,0 +1,13 @@
+{
+  "name": "palermo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Palermo party game: phones as role cards, a shared table screen as the narrator.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.42.0"
+  }
+}
