@@ -42,3 +42,9 @@ Open http://localhost:8787 and host a game. Phones on the same Wi-Fi join at
 - `src/game.js` the rules: roles, nights, votes, wins, and what each player may see
 - `src/story.js` the narrator's lines
 - `public/` the app: `app.js` (screens), `bg.js` (swirling background), `style.css`
+
+## Card art
+
+Rider–Waite–Smith tarot (1909), painted by Pamela Colman Smith, public domain.
+Scans from Wikimedia Commons, fetched by `.github/workflows/fetch-tarot.yml`
+from the list in `public/tarot/sources.txt`.

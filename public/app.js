@@ -162,8 +162,9 @@
   function roleCard(role, size, extra) {
     const r = S.roles[role]; if (!r) return '';
     const team = role === 'butcher' ? S.pub.settings.butcherTeam : r.team;
-    return `<div class="card tarot tilt ${team} ${size || ''} ${extra || ''}"><div class="face"><div class="num">${TAROT.NUM[role] || ''}</div>
-      <div class="art">${spr(role, 72)}</div><div class="nm">${esc(r.gr)}</div><div class="gr">${esc(r.name)}</div><div class="tx">${esc(r.blurb)}</div></div></div>`;
+    // Rider–Waite–Smith painting, with the role's Greek name underneath; the blurb shows on your own big card
+    return `<div class="card rws tilt ${team} ${size || ''} ${extra || ''}"><img src="/tarot/${role}.jpg" alt="" loading="lazy" draggable="false">
+      <div class="cap"><b>${esc(r.gr)}</b><span>${esc(r.name)}</span></div>${size === 'big' ? `<div class="blurb">${esc(r.blurb)}</div>` : ''}</div>`;
   }
   function knowsHTML() {
     const team = S.me.role === 'snitch' ? 'You secretly play for the <b>killers</b>. They don\'t know who you are.'
@@ -270,7 +271,7 @@
     const partners = n.partners && n.partners.length ? `<div class="knows">${n.partners.map(x => `<div class="k"><b>${esc(x.name)}</b> ${x.target ? 'wants ' + esc(pname(x.target)) + (n.target && n.target !== x.target ? ' · pick the same person!' : n.target === x.target ? ' · agreed' : '') : 'hasn\'t picked yet'}</div>`).join('')}</div>` : '';
     return `<div class="panel"><p>${prompt}</p>${partners}
       <div style="margin-top:12px">${seatsHTML({ pick: true, sel: n.target, blocked: n.blocked })}</div>
-      <p class="faint" style="margin-top:12px">${n.target ? `Picked <b>${esc(pname(n.target))}</b>. You can change until everyone's done.` : ''} ${p.acted}/${p.aliveCount} done.</p></div>`;
+      <p class="faint" style="margin-top:12px">${n.target ? `Picked <b>${esc(pname(n.target))}</b>. You can change until everyone's done.` : ''} ${p.acted}/${p.aliveCount} done.${p.waiting.length ? ` Waiting for ${esc(p.waiting.join(', '))}.` : ''}${p.acted === p.aliveCount && !p.killersChose ? ' The killers still have to agree.' : ''}</p></div>`;
   }
   function overHTML() {
     const p = S.pub;
@@ -308,7 +309,7 @@
         <div class="cards" style="margin:14px 0">${specials.map(k => `<div data-role="${k}" class="toggle">${roleCard(k, '', deck[k] ? 'toggle' : 'off toggle')}</div>`).join('')}
           <div>${roleCard('citizen', '', cit > 0 ? '' : 'off')}<div style="text-align:center;margin-top:8px" class="muted">× ${Math.max(0, cit)} citizens</div></div></div>
         <div class="label">Jokers · house rules</div>
-        <div class="cards" style="margin:14px 0">${Object.entries(S.jokers).map(([k, j]) => `<div class="jk"><div class="card tarot joker tilt toggle ${st.jokers[k] ? '' : 'off'}" data-joker="${k}"><div class="face"><div class="num">${TAROT.NUM[k] || ''}</div><div class="art">${spr(k, 60)}</div><div class="nm">${esc(j.name)}</div></div></div><div class="jt">${esc(j.text)}</div></div>`).join('')}</div>
+        <div class="cards" style="margin:14px 0">${Object.entries(S.jokers).map(([k, j]) => `<div class="jk"><div class="card rws joker tilt toggle ${st.jokers[k] ? '' : 'off'}" data-joker="${k}"><img src="/tarot/${k}.jpg" alt="" loading="lazy" draggable="false"><div class="cap"><b>${esc(j.name)}</b></div></div><div class="jt">${esc(j.text)}</div></div>`).join('')}</div>
         <div class="toggle-row" style="margin-bottom:12px"><span class="label">Talk time</span>
           <div class="seg">${[60, 120, 180, 300, 480].map(s => `<button data-talk="${s}" class="${st.discussSec === s ? 'on' : ''}">${s / 60}m</button>`).join('')}</div>
           <span class="label" style="margin-left:8px">Butcher plays for</span>
@@ -330,7 +331,7 @@
       ${next ? `<button class="btn ${p.phase === 'day' ? 'gold' : 'blue'}" data-a="advance" ${nightLocked ? 'disabled' : ''}>${next}</button>` : ''}
       ${p.phase === 'over' ? '<button class="btn green" data-a="lobby">New round, same people</button>' : '<button class="btn small grey" data-a="lobby">End game</button>'}
       ${botLinks()}
-      ${p.phase === 'night' ? `<span class="faint">${p.acted}/${p.aliveCount} acted. ${p.killersChose ? 'The killers have chosen; you can end the night if someone is stuck.' : 'The night only ends once the killers agree on a victim.'}</span>` : ''}</div></div>`;
+      ${p.phase === 'night' ? `<span class="faint">${p.acted}/${p.aliveCount} acted${p.waiting.length ? ' (waiting for ' + esc(p.waiting.join(', ')) + ')' : ''}. ${p.killersChose ? 'The killers have chosen; you can end the night if someone is stuck.' : 'The night only ends once the killers agree on a victim.'}</span>` : ''}</div></div>`;
   }
 
   function botLinks() {

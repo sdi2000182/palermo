@@ -318,6 +318,8 @@ export function publicView(g) {
     })),
     votes: fogged ? null : g.votes, voted: Object.keys(g.votes), tally: fogged ? null : tally(g), voteRestrict: g.voteRestrict,
     acted: night, aliveCount: alive(g).length, killersChose: killersChose(g),
+    // everyone acts at night, so naming who's still deciding gives nothing away
+    waiting: g.phase === 'night' && g.night ? alive(g).filter(p => !g.night.acts[p.id]).map(p => p.name) : [],
     story: g.story.slice(-80),
   };
 }

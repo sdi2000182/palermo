@@ -124,11 +124,18 @@ export class Room extends DurableObject {
     await this.save();
   }
 
-  async webSocketClose(ws) { this.broadcast(); }
-  async webSocketError(ws) { this.broadcast(); }
+  // a closed tab hands its player back: bots pick up again right away
+  async webSocketClose(ws) { await this.dropped(ws); }
+  async webSocketError(ws) { await this.dropped(ws); }
+  async dropped(ws) {
+    if (!this.g) return;
+    this.broadcast(ws);
+    await this.schedule();
+    await this.save();
+  }
 
-  broadcast() {
-    const g = this.g, sockets = this.ctx.getWebSockets();
+  broadcast(closing) {
+    const g = this.g, sockets = this.ctx.getWebSockets().filter(s => s !== closing);
     const online = new Set(sockets.filter(s => s.readyState === 1).map(s => (s.deserializeAttachment() || {}).pid).filter(Boolean));
     for (const p of g.players) p.connected = online.has(p.id);
     const pub = G.publicView(g);
