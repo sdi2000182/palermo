@@ -1,0 +1,15 @@
+trela RWS_Tarot_00_Fool.jpg 200 image/jpeg 193050
+mayor RWS_Tarot_04_Emperor.jpg 200 image/jpeg 224698
+detective RWS_Tarot_09_Hermit.jpg 200 image/jpeg 169272
+hidden RWS_Tarot_13_Death.jpg 200 image/jpeg 226404
+doctor RWS_Tarot_14_Temperance.jpg 200 image/jpeg 237437
+shown RWS_Tarot_15_Devil.jpg 200 image/jpeg 199334
+butcher RWS_Tarot_16_Tower.jpg 200 image/jpeg 194129
+snitch RWS_Tarot_18_Moon.jpg 200 image/jpeg 206251
+citizen RWS_Tarot_19_Sun.jpg 200 image/jpeg 231495
+graves RWS_Tarot_20_Judgement.jpg 200 image/jpeg 227111
+lovers RWS_Tarot_06_Lovers.jpg 200 image/jpeg 237250
+fog RWS_Tarot_02_High_Priestess.jpg 200 image/jpeg 216167
+words RWS_Tarot_17_Star.jpg 200 image/jpeg 203239
+second RWS_Tarot_10_Wheel_of_Fortune.jpg 200 image/jpeg 224996
+iron RWS_Tarot_11_Justice.jpg 200 image/jpeg 221208
