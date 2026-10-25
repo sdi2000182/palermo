@@ -9,8 +9,8 @@
   const PHASE = {
     lobby: ['Lobby', 'Waiting for everyone to join'], reveal: ['Your role', 'Look at your card. Don\'t let anyone see.'],
     ritual: ['The first night', 'Eyes closed. Do what the narrator says.'],
-    night: ['Night', 'Eyes closed. Act in secret.'], day: ['Day', 'Talk. Accuse. Lie.'], vote: ['The Vote', 'Who goes to the fountain?'],
-    dusk: ['Dusk', 'The town goes home.'], over: ['Game over', ''],
+    night: ['Night', 'Eyes closed. Act in secret.'], day: ['Day', 'Listen to the narrator. Voting opens when the story is told.'],
+    vote: ['The Vote', 'Talk it over and vote whenever you\'re ready.'], dusk: ['Dusk', 'Night falls by itself soon.'], over: ['Game over', ''],
   };
 
   const params = new URLSearchParams(location.search);
@@ -289,7 +289,7 @@
         ${seatsHTML()}</div>`;
     } else if (p.phase === 'vote') {
       const can = me.canVote;
-      body = `<div class="panel">${can ? `<p>${me.vote ? `You're voting for <b>${esc(pname(me.vote))}</b>. Tap someone else to change.` : 'Tap who you vote for.'}</p>` : `<p>${me.alive ? spr('butcher', 22) + ' The Butcher took your vote this round.' : spr('skull', 22) + ' The dead don\'t vote.'}</p>`}
+      body = `<div class="panel">${can ? `<p>${me.vote ? `You're voting for <b>${esc(pname(me.vote))}</b>. Tap someone else to change.` : 'Tap who you vote for, whenever you\'re ready. The vote closes by itself once everyone has voted.'}</p>` : `<p>${me.alive ? spr('butcher', 22) + ' The Butcher took your vote this round.' : spr('skull', 22) + ' The dead don\'t vote.'}</p>`}
         ${seatsHTML({ pick: can, sel: me.vote, only: p.voteRestrict, votes: true })}
         ${can && me.vote ? '<div style="margin-top:12px"><button class="btn small grey" data-a="unvote">Take back my vote</button></div>' : ''}</div>
         <div class="panel">${boardHTML()}</div>
@@ -353,9 +353,7 @@
           <div>${roleCard('citizen', '', cit > 0 ? '' : 'off')}<div style="text-align:center;margin-top:8px" class="muted">× ${Math.max(0, cit)} citizens</div></div></div>
         <div class="label">Jokers · house rules</div>
         <div class="cards" style="margin:14px 0">${Object.entries(S.jokers).map(([k, j]) => `<div class="jk"><div class="card rws joker tilt toggle ${st.jokers[k] ? '' : 'off'}" data-joker="${k}"><img src="/tarot/${k}.jpg" alt="" loading="lazy" draggable="false" width="420" height="720" style="width:100%;height:auto;display:block"><div class="cap"><b>${esc(j.name)}</b></div></div><div class="jt">${esc(j.text)}</div></div>`).join('')}</div>
-        <div class="toggle-row" style="margin-bottom:12px"><span class="label">Talk time</span>
-          <div class="seg">${[60, 120, 180, 300, 480].map(s => `<button data-talk="${s}" class="${st.discussSec === s ? 'on' : ''}">${s / 60}m</button>`).join('')}</div>
-          <span class="label" style="margin-left:8px">Butcher plays for</span>
+        <div class="toggle-row" style="margin-bottom:12px"><span class="label">Butcher plays for</span>
           <div class="seg"><button data-bt="killers" class="${st.butcherTeam === 'killers' ? 'on' : ''}">killers</button><button data-bt="town" class="${st.butcherTeam === 'town' ? 'on' : ''}">town</button></div></div>
         <div class="toggle-row"><span class="label">Test mode</span>
           <button class="btn small purple" data-a="bot">+ Bot</button>
@@ -368,7 +366,8 @@
           <span class="grow"></span>${tableMode ? '' : `<a class="btn small blue" href="/?r=${p.code}&table=1" target="_blank">Open table screen</a>`}</div>
         ${tableMode ? '' : `<div style="margin-top:14px" class="row"><div class="qr" id="qr"></div><div class="muted">Friends scan this or open<br><b>${esc(location.host)}</b> and type <b style="color:var(--gold)">${esc(p.code)}</b></div></div>`}</div>`;
     }
-    const next = { ritual: 'Next step', reveal: 'Start the night now', night: 'End the night', day: 'Start the vote', vote: 'Close the vote', dusk: 'Next night' }[p.phase];
+    // everything moves on by itself; these are only for when the table wants to hurry or something is stuck
+    const next = { ritual: 'Next step', reveal: 'Start the night now', night: 'End the night', day: 'Open the vote now', vote: 'Close the vote now', dusk: 'Start the night now' }[p.phase];
     const nightLocked = p.phase === 'night' && !p.killersChose;
     return `<div class="panel host"><div class="label" style="margin-bottom:10px">Host</div><div class="row">
       ${next ? `<button class="btn ${p.phase === 'day' ? 'gold' : 'blue'}" data-a="advance" ${nightLocked ? 'disabled' : ''}>${next}</button>` : ''}

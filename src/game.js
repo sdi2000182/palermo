@@ -70,6 +70,10 @@ const say = (g, kind, key, vars) => {
   if (g.story.length > 250) g.story.splice(0, g.story.length - 250);
 };
 
+// how long the narrator takes to read some lines (a Greek voice reads roughly 14 characters a second)
+const readMs = lines => lines.reduce((t, l) => t + 900 + l.text.length * 70, 1500);
+const linesSince = (g, seq) => g.story.filter(l => l.id > seq);
+
 /* ---------- lobby ---------- */
 export function join(g, name, bot) {
   name = String(name || '').trim().slice(0, 24);
@@ -145,7 +149,7 @@ export function startNight(g) {
   g.round++;
   g.phase = 'night';
   g.night = { acts: {} };
-  g.endsAt = 0;
+  g.endsAt = 0; g.nightAt = 0;
   for (const p of g.players) p.silenced = false;
   say(g, 'night', g.round === 1 ? 'firstActions' : 'night', { round: g.round });
 }
@@ -181,6 +185,7 @@ export function resolveNight(g) {
   const rumour = Object.entries(sus).sort((a, b) => b[1] - a[1])[0];
 
   g.phase = 'day';
+  const mark = g.seq;
   say(g, 'dawn', 'dawn', { round: g.round });
   const dead = [];
   if (victimId && victimId === saveId) say(g, 'saved', 'saved', { name: byId(g, victimId).name });
@@ -191,8 +196,8 @@ export function resolveNight(g) {
   if (rumour && rumour[1] >= 2 && byId(g, rumour[0]).alive) say(g, 'rumour', 'rumour', { name: byId(g, rumour[0]).name });
   g.night = null;
   if (checkWin(g)) return;
-  g.endsAt = Date.now() + g.settings.discussSec * 1000;
-  say(g, 'day', 'discuss', { min: Math.round(g.settings.discussSec / 60) });
+  // voting opens by itself once the narrator has told the morning's story
+  g.voteAt = g.endsAt = Date.now() + readMs(linesSince(g, mark));
 }
 
 /* a death, with heartbreak for lovers and role reveal under Open Graves */
@@ -221,7 +226,7 @@ export function revealMayor(g, p) {
 }
 export function openVote(g) {
   if (g.phase !== 'day') return;
-  g.phase = 'vote'; g.votes = {}; g.voteRestrict = null; g.revoted = false; g.endsAt = 0;
+  g.phase = 'vote'; g.votes = {}; g.voteRestrict = null; g.revoted = false; g.endsAt = 0; g.voteAt = 0;
   say(g, 'vote', 'voteOpen', {});
 }
 export const canVote = (g, p) => p.alive && !p.silenced;
@@ -244,8 +249,9 @@ export function tally(g) {
 export const allVoted = g => alive(g).filter(p => canVote(g, p)).every(p => g.votes[p.id]);
 export function closeVote(g) {
   if (g.phase !== 'vote') return;
+  const mark = g.seq;
   const t = tally(g), entries = Object.entries(t).sort((a, b) => b[1] - a[1]);
-  if (!entries.length) { say(g, 'quiet', 'noVotes', {}); return toDusk(g); }
+  if (!entries.length) { say(g, 'quiet', 'noVotes', {}); return toDusk(g, null, mark); }
   const best = entries[0][1], tied = entries.filter(e => e[1] === best).map(e => e[0]);
   let chosen = tied.length === 1 ? tied[0] : null;
   if (!chosen && g.settings.jokers.iron) {
@@ -257,7 +263,7 @@ export function closeVote(g) {
     say(g, 'vote', 'tieRevote', { names: tied.map(id => byId(g, id).name).join(' και ') });
     return;
   }
-  if (!chosen) { say(g, 'quiet', 'tieNobody', {}); return toDusk(g); }
+  if (!chosen) { say(g, 'quiet', 'tieNobody', {}); return toDusk(g, null, mark); }
   const p = byId(g, chosen);
   if (p.role === 'trela') {
     kill(g, p, 'vote');
@@ -267,12 +273,23 @@ export function closeVote(g) {
   }
   kill(g, p, 'vote');
   if (checkWin(g)) return;
-  toDusk(g, p);
+  toDusk(g, p, mark);
 }
-function toDusk(g, executed) {
+// after the vote: the narrator tells what happened, last words if that joker is on, then night falls by itself
+function toDusk(g, executed, mark) {
   g.phase = 'dusk'; g.voteRestrict = null;
-  g.endsAt = executed && g.settings.jokers.words ? Date.now() + 30000 : 0;
-  if (executed && g.settings.jokers.words) say(g, 'words', 'lastWords', { name: executed.name });
+  const words = executed && g.settings.jokers.words;
+  if (words) say(g, 'words', 'lastWords', { name: executed.name });
+  g.nightAt = g.endsAt = Date.now() + readMs(linesSince(g, mark)) + (words ? 30000 : 0);
+}
+
+/* the game moves itself along on timers; the worker's alarm calls this */
+export const nextTick = g => g.phase === 'day' ? g.voteAt || 0 : g.phase === 'dusk' ? g.nightAt || 0 : 0;
+export function tick(g) {
+  const due = nextTick(g);
+  if (!due || Date.now() < due - 100) return false;
+  if (g.phase === 'day') openVote(g); else startNight(g);
+  return true;
 }
 
 /* ---------- winning ---------- */
