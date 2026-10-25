@@ -1,0 +1,17 @@
+# Rider–Waite–Smith tarot (1909, art by Pamela Colman Smith), public domain.
+# Scans from Wikimedia Commons. name  commons-file
+trela      RWS_Tarot_00_Fool.jpg
+mayor      RWS_Tarot_04_Emperor.jpg
+detective  RWS_Tarot_09_Hermit.jpg
+hidden     RWS_Tarot_13_Death.jpg
+doctor     RWS_Tarot_14_Temperance.jpg
+shown      RWS_Tarot_15_Devil.jpg
+butcher    RWS_Tarot_16_Tower.jpg
+snitch     RWS_Tarot_18_Moon.jpg
+citizen    RWS_Tarot_19_Sun.jpg
+graves     RWS_Tarot_20_Judgement.jpg
+lovers     RWS_Tarot_06_Lovers.jpg
+fog        RWS_Tarot_02_High_Priestess.jpg
+words      RWS_Tarot_17_Star.jpg
+second     RWS_Tarot_10_Wheel_of_Fortune.jpg
+iron       RWS_Tarot_11_Justice.jpg

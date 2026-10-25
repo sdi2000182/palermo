@@ -4,15 +4,15 @@ import { line } from './story.js';
 
 export const ROLES = {
   hidden:    { name: 'Hidden Killer', gr: 'Κρυφός Δολοφόνος', art: 'ο Κρυφός Δολοφόνος', team: 'killers', night: 'kill',
-               blurb: 'Kill at night with the other killers. The Snitch knows who you are.' },
+               blurb: 'Kill at night with the other killers. On the first night the Snitch will see who you are.' },
   shown:     { name: 'Shown Killer', gr: 'Φανερός Δολοφόνος', art: 'ο Φανερός Δολοφόνος', team: 'killers', night: 'kill',
-               blurb: 'Kill at night with the other killers. The Detective knows who you are.' },
+               blurb: 'Kill at night with the other killers. On the first night the Detective will see who you are.' },
   butcher:   { name: 'Butcher', gr: 'Χασάπης', art: 'ο Χασάπης', team: 'killers', night: 'silence',
                blurb: 'Each night pick someone to silence: tomorrow they can\'t speak or vote.' },
   detective: { name: 'Detective', gr: 'Αστυνόμος', art: 'ο Αστυνόμος', team: 'town',
-               blurb: 'You know who the Shown Killer is. Steer the town without getting killed.' },
+               blurb: 'On the first night you\'ll see who the Shown Killer is. Steer the town without getting killed.' },
   snitch:    { name: 'Snitch', gr: 'Ρουφιάνος', art: 'ο Ρουφιάνος', team: 'killers',
-               blurb: 'You secretly work for the killers. You know the Hidden Killer; they don\'t know you.' },
+               blurb: 'You secretly work for the killers. On the first night you\'ll see who the Hidden Killer is; they don\'t know you.' },
   doctor:    { name: 'Doctor', gr: 'Γιατρός', art: 'ο Γιατρός', team: 'town', night: 'save',
                blurb: 'Each night protect one person. Never the same person two nights running.' },
   mayor:     { name: 'Mayor', gr: 'Δήμαρχος', art: 'ο Δήμαρχος', team: 'town',
@@ -108,7 +108,31 @@ export function start(g) {
 export function ready(g, p) {
   if (g.phase !== 'reveal') return;
   p.ready = true;
-  if (g.players.every(x => x.ready)) startNight(g);
+  if (g.players.every(x => x.ready)) startRitual(g);
+}
+
+/* ---------- the first night: the narrator calls roles to open their eyes and raise hands ----------
+   The app never tells anyone who is who; people see it at the table, like the real game. */
+const STEP_MS = 8000;
+export function startRitual(g) {
+  const has = r => g.players.some(p => p.role === r);
+  const steps = ['ritClose'];
+  if (g.players.some(p => isCore(g, p))) steps.push('ritKillersOpen', 'ritKillersClose');
+  if (has('snitch') && has('hidden')) steps.push('ritSnitchOpen', 'ritSnitchClose');
+  if (has('detective') && has('shown')) steps.push('ritDetOpen', 'ritDetClose');
+  if (g.players.some(p => p.lover)) steps.push('ritLoversOpen', 'ritLoversClose');
+  g.phase = 'ritual';
+  g.ritual = { steps, i: 0, next: Date.now() + STEP_MS };
+  say(g, 'ritual', steps[0], {});
+}
+export function ritualStep(g) {
+  if (g.phase !== 'ritual') return;
+  const r = g.ritual;
+  r.i++;
+  if (r.i >= r.steps.length) { g.ritual = null; startNight(g); return; }
+  // the "raise your hand" moments get a little longer
+  r.next = Date.now() + (/Open$/.test(r.steps[r.i]) ? STEP_MS + 3000 : STEP_MS);
+  say(g, 'ritual', r.steps[r.i], {});
 }
 
 /* ---------- night ---------- */
@@ -123,7 +147,7 @@ export function startNight(g) {
   g.night = { acts: {} };
   g.endsAt = 0;
   for (const p of g.players) p.silenced = false;
-  say(g, 'night', g.round === 1 ? 'firstNight' : 'night', { round: g.round });
+  say(g, 'night', g.round === 1 ? 'firstActions' : 'night', { round: g.round });
 }
 const killers = g => alive(g).filter(p => nightAction(g, p) === 'kill');
 function killersAgree(g) {
@@ -266,7 +290,8 @@ export function checkWin(g) {
 
 /* the host's "next" button: moves whatever phase we're in along */
 export function advance(g) {
-  if (g.phase === 'reveal') startNight(g);
+  if (g.phase === 'reveal') startRitual(g);
+  else if (g.phase === 'ritual') ritualStep(g);
   else if (g.phase === 'night') { if (killersChose(g)) resolveNight(g); else return { error: 'The night goes on until the killers agree on a victim.' }; }
   else if (g.phase === 'day') openVote(g);
   else if (g.phase === 'vote') closeVote(g);
@@ -275,7 +300,7 @@ export function advance(g) {
 
 export function backToLobby(g) {
   for (const p of g.players) Object.assign(p, { role: null, alive: true, ready: false, silenced: false, mayorRevealed: false, lover: null, revealed: false });
-  Object.assign(g, { phase: 'lobby', round: 0, night: null, votes: {}, voteRestrict: null, revoted: false, winner: null, endsAt: 0 });
+  Object.assign(g, { ritual: null, phase: 'lobby', round: 0, night: null, votes: {}, voteRestrict: null, revoted: false, winner: null, endsAt: 0 });
   g.story = [];
 }
 
@@ -298,16 +323,9 @@ export function publicView(g) {
 }
 export function privateView(g, p) {
   if (!p.role) return { id: p.id, name: p.name };
-  const knows = [];
+  // who's who is learned at the table during the first night, never from the app
   const myTeam = teamOf(g, p);
-  for (const o of g.players) {
-    if (o.id === p.id) continue;
-    if (isCore(g, p) && isCore(g, o)) knows.push({ id: o.id, name: o.name, as: ROLES[o.role].name });
-    else if (p.role === 'detective' && o.role === 'shown') knows.push({ id: o.id, name: o.name, as: 'Shown Killer' });
-    else if (p.role === 'snitch' && o.role === 'hidden') knows.push({ id: o.id, name: o.name, as: 'Hidden Killer' });
-    if (p.lover === o.id) knows.push({ id: o.id, name: o.name, as: 'your Lover' });
-  }
-  const me = { id: p.id, name: p.name, role: p.role, team: myTeam, alive: p.alive, silenced: p.silenced, mayorRevealed: p.mayorRevealed, knows, ready: p.ready };
+  const me = { id: p.id, name: p.name, role: p.role, team: myTeam, alive: p.alive, silenced: p.silenced, mayorRevealed: p.mayorRevealed, lover: !!p.lover, ready: p.ready };
   if (g.phase === 'night' && g.night && p.alive) {
     const kind = nightAction(g, p), mine = g.night.acts[p.id];
     me.night = { kind, target: mine ? mine.target : null, blocked: [] };

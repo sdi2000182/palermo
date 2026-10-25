@@ -8,6 +8,7 @@
   const spr = (name, size, cls) => window.TAROT.svg(name, size || 20, cls);
   const PHASE = {
     lobby: ['Lobby', 'Waiting for everyone to join'], reveal: ['Your role', 'Look at your card. Don\'t let anyone see.'],
+    ritual: ['The first night', 'Eyes closed. Do what the narrator says.'],
     night: ['Night', 'Eyes closed. Act in secret.'], day: ['Day', 'Talk. Accuse. Lie.'], vote: ['The Vote', 'Who goes to the fountain?'],
     dusk: ['Dusk', 'The town goes home.'], over: ['Game over', ''],
   };
@@ -165,10 +166,10 @@
       <div class="art">${spr(role, 72)}</div><div class="nm">${esc(r.gr)}</div><div class="gr">${esc(r.name)}</div><div class="tx">${esc(r.blurb)}</div></div></div>`;
   }
   function knowsHTML() {
-    const k = S.me.knows || [];
     const team = S.me.role === 'snitch' ? 'You secretly play for the <b>killers</b>. They don\'t know who you are.'
       : S.me.team === 'killers' ? 'You play for the <b>killers</b>.' : S.me.team === 'trela' ? 'You play <b>alone</b>.' : 'You play for the <b>town</b>.';
-    return `<div class="knows"><div class="k">${team}</div>${k.map(x => `<div class="k"><b>${esc(x.name)}</b> is ${esc(x.as)}</div>`).join('')}</div>`;
+    const lover = S.me.lover ? '<div class="k">' + spr('lovers', 18) + ' You are one of the <b>Lovers</b>. Open your eyes when the narrator calls the Lovers.</div>' : '';
+    return `<div class="knows"><div class="k">${team}</div>${lover}</div>`;
   }
   function seatsHTML(o) {
     o = o || {};
@@ -229,6 +230,11 @@
         <div class="cards" data-a="flip" style="cursor:pointer">${ui.flipped ? roleCard(me.role, 'big', 'flip') : `<div class="card big back"><div class="face"><b>?</b>Tap to flip<br><span style="font-size:14px">Hide your screen</span></div></div>`}</div>
         ${ui.flipped ? knowsHTML() : ''}
         <div style="margin-top:14px">${me.ready ? `<p class="muted">Waiting for the others… ${ready}/${p.players.length}</p>` : `<button class="btn green" data-a="ready" ${ui.flipped ? '' : 'disabled'}>I've seen it</button>`}</div></div>`;
+    } else if (p.phase === 'ritual') {
+      const last = p.story[p.story.length - 1];
+      body = `<div class="panel" style="text-align:center"><p style="margin:6px">${spr('moon', 64)}</p>
+        <p class="muted">Close your eyes and listen. Open them only when the narrator calls your role.</p>
+        ${last ? `<p style="font-size:20px;font-weight:700">${esc(last.text)}</p>` : ''}</div>`;
     } else if (p.phase === 'night') {
       body = nightHTML();
     } else if (p.phase === 'day') {
@@ -318,7 +324,7 @@
           <span class="grow"></span>${tableMode ? '' : `<a class="btn small blue" href="/?r=${p.code}&table=1" target="_blank">Open table screen</a>`}</div>
         ${tableMode ? '' : `<div style="margin-top:14px" class="row"><div class="qr" id="qr"></div><div class="muted">Friends scan this or open<br><b>${esc(location.host)}</b> and type <b style="color:var(--gold)">${esc(p.code)}</b></div></div>`}</div>`;
     }
-    const next = { reveal: 'Start the night now', night: 'End the night', day: 'Start the vote', vote: 'Close the vote', dusk: 'Next night' }[p.phase];
+    const next = { ritual: 'Next step', reveal: 'Start the night now', night: 'End the night', day: 'Start the vote', vote: 'Close the vote', dusk: 'Next night' }[p.phase];
     const nightLocked = p.phase === 'night' && !p.killersChose;
     return `<div class="panel host"><div class="label" style="margin-bottom:10px">Host</div><div class="row">
       ${next ? `<button class="btn ${p.phase === 'day' ? 'gold' : 'blue'}" data-a="advance" ${nightLocked ? 'disabled' : ''}>${next}</button>` : ''}
@@ -342,7 +348,7 @@
           <p class="faint" style="margin:10px 0 0;font-size:15px">Open it on a laptop or TV to be the table screen, or on your phone if you're playing too.</p></div>
         <div class="panel"><form class="row" data-form="join"><input class="input grow" name="code" maxlength="4" placeholder="ROOM CODE" autocomplete="off" autocapitalize="characters" style="text-transform:uppercase;letter-spacing:4px"><button class="btn blue">Join</button></form></div>
         <div class="panel in"><div class="label" style="margin-bottom:6px">How it works</div>
-          <p class="muted" style="margin:0;font-size:15px">Everyone joins on their phone and gets a secret role card. At night you act in secret on your phone; by day the table screen tells the story and you argue, then vote someone to the fountain. The Detective knows the Shown Killer, the Snitch knows the Hidden Killer.</p></div>
+          <p class="muted" style="margin:0;font-size:15px">Everyone joins on their phone and gets a secret role card. At night you act in secret on your phone; by day the table screen tells the story and you argue, then vote someone to the fountain. On the first night the narrator has the Snitch see the Hidden Killer and the Detective see the Shown Killer, by raising hands, just like at the table.</p></div>
       </div></div>`;
   }
   function nameHTML() {

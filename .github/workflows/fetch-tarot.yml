@@ -1,0 +1,36 @@
+name: Fetch tarot card art
+
+# Downloads the public-domain Rider–Waite–Smith scans listed in public/tarot/sources.txt
+on:
+  push:
+    paths:
+      - 'public/tarot/sources.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download scans
+        run: |
+          cd public/tarot
+          : > report.txt
+          grep -v '^#' sources.txt | while read -r name file; do
+            [ -z "$name" ] && continue
+            code=$(curl -sSL -A "palermo-game/1.0 (https://github.com/${{ github.repository }})" \
+              -o "$name.jpg" -w '%{http_code} %{content_type} %{size_download}' \
+              "https://commons.wikimedia.org/wiki/Special:FilePath/$file?width=420")
+            echo "$name $file $code" | tee -a report.txt
+            case "$code" in 200\ image/*) ;; *) rm -f "$name.jpg";; esac
+            sleep 1
+          done
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add public/tarot
+          git diff --cached --quiet || (git commit -m "Add Rider-Waite-Smith tarot scans" && git pull --rebase && git push)

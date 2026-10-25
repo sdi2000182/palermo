@@ -55,7 +55,7 @@ window.TAROT = (function () {
     hourglass: `<path ${S} stroke-width="3.5" d="M14 6h36M14 58h36"/><path ${S} stroke-width="3" d="M18 7c0 13 14 17 14 25S18 44 18 57M46 7c0 13-14 17-14 25s14 12 14 25"/>
       <path ${F} d="M22 14h20c-2 6-7 9-10 13-3-4-8-7-10-13ZM20 56c1-7 7-10 12-13 5 3 11 6 12 13Z"/>`,
   };
-  const ALIAS = { title: 'shown', info: 'hidden', night: 'moon', dawn: 'sun', death: 'skull', saved: 'doctor', silence: 'butcher', rumour: 'snitch', day: 'hourglass', vote: 'ballot', win: 'trophy', reveal: 'card', quiet: 'fog' };
+  const ALIAS = { ritual: 'moon', title: 'shown', info: 'hidden', night: 'moon', dawn: 'sun', death: 'skull', saved: 'doctor', silence: 'butcher', rumour: 'snitch', day: 'hourglass', vote: 'ballot', win: 'trophy', reveal: 'card', quiet: 'fog' };
   // tarot numerals for the role and joker cards
   const NUM = { trela: '0', mayor: 'IV', lovers: 'VI', detective: 'IX', doctor: 'XIV', shown: 'XV', butcher: 'XVI', hidden: 'XIII', snitch: 'XVIII', citizen: 'XIX', graves: 'XX', words: 'III', fog: 'II', second: 'X', iron: 'XI' };
   function svg(name, size, cls) {

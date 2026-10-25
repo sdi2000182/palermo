@@ -110,11 +110,13 @@ export class Room extends DurableObject {
     const times = [];
     if (G.botsPending(g)) times.push(now + 1200 + Math.random() * 1500);
     if (g.allVotedAt) times.push(g.allVotedAt + 4000);
+    if (g.phase === 'ritual' && g.ritual) times.push(Math.max(now + 200, g.ritual.next));
     if (times.length) await this.ctx.storage.setAlarm(Math.min(...times));
   }
 
   async alarm() {
     const g = this.g; if (!g) return;
+    if (g.phase === 'ritual' && g.ritual && Date.now() >= g.ritual.next - 100) G.ritualStep(g);
     if (G.botsPending(g)) G.botStep(g);
     if (g.phase === 'vote' && G.allVoted(g) && g.allVotedAt && Date.now() - g.allVotedAt >= 3500) { G.closeVote(g); g.allVotedAt = 0; }
     this.broadcast();
