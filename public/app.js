@@ -23,8 +23,9 @@
   };
   let S = { pub: null, me: null, host: false, bots: [], roles: {}, jokers: {}, conn: 'idle' };
   let ws = null, retry = 0, pendingName = null, layout = '';
-  const ui = { flipped: false, peek: false, tts: false, lastStory: 0, nameErr: '', missing: false };
-  try { ui.tts = localStorage.getItem('palermo:tts') === '1'; } catch (e) { }
+  const ui = { flipped: false, peek: false, tts: false, unlocked: false, lastStory: 0, nameErr: '', missing: false };
+  // the table screen narrates by default; the host's phone only if they turned it on
+  try { const t = localStorage.getItem('palermo:tts'); ui.tts = t === null ? tableMode : t === '1'; } catch (e) { ui.tts = tableMode; }
 
   function toast(msg) {
     const t = $('#toast'); t.textContent = msg; t.classList.remove('hidden');
@@ -100,7 +101,8 @@
       ${S.conn !== 'open' ? '<span class="chip" style="background:var(--red)">offline…</span>' : ''}
       ${tableMode || S.host ? `<button class="btn small ${ui.tts ? 'gold' : 'grey'}" data-a="tts" title="Read the story out loud in Greek">Narrator ${ui.tts ? 'on' : 'off'}</button>` : ''}
       ${S.me && S.me.role && p.phase !== 'over' ? `<button class="btn small blue" data-a="peek">${spr('card', 18)} My card</button>` : ''}</div>
-      ${ui.peek && S.me && S.me.role ? `<div class="panel" style="text-align:center">${roleCard(S.me.role, 'big')}${knowsHTML()}</div>` : ''}`;
+      ${ui.peek && S.me && S.me.role ? `<div class="panel" style="text-align:center">${roleCard(S.me.role, 'big')}${knowsHTML()}</div>` : ''}
+      ${tableMode || S.host ? narratorBar() : ''}`;
     tick();
   }
 
@@ -146,14 +148,55 @@
     const step = () => { el.textContent = text.slice(0, ++i); $('#story') && ($('#story').scrollTop = 1e9); if (i < text.length) setTimeout(step, 24); else el.classList.remove('caret'); };
     step();
   }
-  // the story is Greek, so it's read by the device's Greek voice (iPhone, Android, Mac and Windows all have one)
-  function greekVoice() { return speechSynthesis.getVoices().find(v => /^el/i.test(v.lang)); }
+  /* ---------------- narrator voice ----------------
+     The story is Greek, read by the device's own Greek voice. Browsers only allow speech after a tap
+     on the page, so after a reload we wait for one before speaking. */
+  const canSpeak = 'speechSynthesis' in window;
+  let voices = [];
+  function loadVoices() { if (canSpeak) voices = speechSynthesis.getVoices(); }
+  if (canSpeak) { loadVoices(); speechSynthesis.onvoiceschanged = () => { loadVoices(); renderTop(); }; }
+  function greekVoice() {
+    const el = voices.filter(v => /^el/i.test(v.lang));
+    return el.find(v => /natural|neural|online|premium|enhanced/i.test(v.name)) || el[0] || null;
+  }
   function speak(text) {
-    if (!('speechSynthesis' in window)) return toast('This browser can\'t speak. Try Chrome or Safari.');
-    const u = new SpeechSynthesisUtterance(text.replace(/[^\p{L}\p{N}\s.,!?;'’:()-]/gu, ''));
-    u.lang = 'el-GR'; u.rate = 0.95; u.pitch = 0.9;
-    const v = greekVoice(); if (v) u.voice = v;
-    speechSynthesis.speak(u);
+    if (!canSpeak) return toast('This browser can\'t speak. Try Chrome, Edge or Safari.');
+    if (!ui.unlocked) return;
+    speechSynthesis.resume();
+    const v = greekVoice();
+    // Chrome goes quiet partway through long utterances, so read one sentence at a time
+    for (const part of text.replace(/[^\p{L}\p{N}\s.,!?;'’:()-]/gu, '').split(/(?<=[.!;])\s+/)) {
+      if (!part.trim()) continue;
+      const u = new SpeechSynthesisUtterance(part);
+      u.lang = 'el-GR'; u.rate = 0.95; u.pitch = 0.9;
+      if (v) u.voice = v;
+      speechSynthesis.speak(u);
+    }
+  }
+  function unlockVoice() {
+    if (ui.unlocked || !canSpeak) return;
+    ui.unlocked = true;
+    const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u);
+    setTimeout(renderTop, 350);   // after the click lands, so the button being tapped isn't swapped out under it
+  }
+  document.addEventListener('pointerdown', () => { if (ui.tts) unlockVoice(); }, true);
+  function voiceHelp() {
+    const ua = navigator.userAgent;
+    const how = /iPhone|iPad/.test(ua) ? 'The iPhone has a Greek voice (Melina) built in. Turn off the silent switch and turn the volume up.'
+      : /Android/.test(ua) ? 'Settings → Text-to-speech → Google → Install voice data → Ελληνικά (Greek).'
+      : /Mac/.test(ua) ? 'System Settings → Accessibility → Spoken Content → System voice → Manage Voices → Greek (Melina), then reload.'
+      : /Edg\//.test(ua) ? 'Edge normally has Greek voices; check that the computer\'s sound is on.'
+      : 'Easiest: open this page in Microsoft Edge, which has Greek voices built in. Or Windows Settings → Time & language → Speech → Add voices → Ελληνικά, then reload.';
+    return `<div class="panel" style="border:3px solid var(--red)"><b>No Greek voice on this device, so the narrator is silent.</b><br><span class="muted">${how}</span></div>`;
+  }
+
+  function narratorBar() {
+    if (!canSpeak) return '';
+    if (!ui.tts) return tableMode ? `<div class="panel row" style="justify-content:space-between"><span>The narrator reads the story aloud in Greek.</span><button class="btn gold" data-a="tts">Turn on the narrator</button></div>` : '';
+    if (!ui.unlocked) return `<div class="panel row" style="justify-content:space-between;border:3px solid var(--gold)"><span>Tap here once so the browser lets the narrator speak.</span><button class="btn gold" data-a="unlock">Tap to hear the narrator</button></div>`;
+    if (voices.length && !greekVoice()) return voiceHelp();
+    const v = greekVoice();
+    return v ? `<div class="faint" style="font-size:13px;margin:4px 2px 0">Narrator voice: ${esc(v.name)} · <a href="#" data-a="testvoice">test</a></div>` : '';
   }
 
   /* ---------------- pieces ---------------- */
@@ -402,11 +445,13 @@
       case 'nobots': send({ t: 'removeBots' }); break;
       case 'advance': send({ t: 'advance' }); break;
       case 'lobby': if (p.phase === 'over' || confirm('End this game for everyone?')) send({ t: 'lobby' }); break;
+      case 'unlock': unlockVoice(); speak('Ο αφηγητής είναι εδώ.'); break;
+      case 'testvoice': e.preventDefault(); speak('Παλέρμο, μετά τα μεσάνυχτα. Όλοι, κλείστε τα μάτια.'); break;
       case 'tts':
         ui.tts = !ui.tts;
         try { localStorage.setItem('palermo:tts', ui.tts ? '1' : '0'); } catch (x) { }
-        if (ui.tts) { speak('Ο αφηγητής είναι εδώ.'); setTimeout(() => { if (!greekVoice()) toast('No Greek voice found on this device. Add one in its speech settings.'); }, 600); }
-        else speechSynthesis.cancel();
+        if (ui.tts) { unlockVoice(); speak('Ο αφηγητής είναι εδώ. Καλή διασκέδαση.'); }
+        else if (canSpeak) speechSynthesis.cancel();
         renderTop(); break;
     }
   });
